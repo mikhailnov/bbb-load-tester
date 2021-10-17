@@ -36,13 +36,24 @@ if [ -z "$NUM" ] || ! [ "$NUM" -gt 0 ]; then
 	exit 1
 fi
 
+XSERVER="${XSERVER:-}"
+case "$XSERVER" in
+	Xephyr ) : ;;
+	Xvfb ) : ;;
+	* )
+		# shellcheck disable=SC2016
+		echo 'Set $XSERVER to Xephyr or Xvfb!'
+		exit 1
+	;;
+esac
+
 # + python3-opencv
 for i in \
 	bc \
 	"$CHROMIUM" \
 	scrot \
 	xdotool \
-	Xephyr \
+	"$XSERVER" \
 	xfwm4
 do
 	if ! command -v "$i" >/dev/null 2>&1; then
@@ -138,9 +149,12 @@ _gen_virt_display(){
 
 # $1: resolution
 # $2: screen
-# example: _xephyr_start 1024x720 :10
-_xephyr_start(){
-	_run Xephyr -br -ac -noreset -screen "$1" "$2"
+# example: _xserver_start 1024x720 :10
+_xserver_start(){
+	case "$XSERVER" in
+		Xephyr ) _run Xephyr -br -ac -noreset -screen "$1" "$2" ;;
+		Xvfb ) _run Xvfb "$2" -screen 0 "$1"x24 ;;
+	esac
 	DISPLAY="$2" _run xfwm4
 }
 
@@ -171,7 +185,7 @@ _echo_tab(){
 # $2: URL
 _open_bbb_session_dumalogiya(){
 	local X="$1"
-	_xephyr_start "$WINDOW_WIDTH"x"$WINDOW_HEIGHT" "$X"
+	_xserver_start "$WINDOW_WIDTH"x"$WINDOW_HEIGHT" "$X"
 	_launch_chromium "$X" "$2"
 	_sleep 6
 	DISPLAY="$X" xdotool key Tab Tab Tab
@@ -187,7 +201,7 @@ _open_bbb_session_dumalogiya(){
 # $2: URL
 _open_bbb_session_greenlight(){
 	local X="$1"
-	_xephyr_start "$WINDOW_WIDTH"x"$WINDOW_HEIGHT" "$X"
+	_xserver_start "$WINDOW_WIDTH"x"$WINDOW_HEIGHT" "$X"
 	_launch_chromium "$X" "$2"
 	_sleep 6
 	DISPLAY="$X" xdotool type "Load Testing ($X)"
