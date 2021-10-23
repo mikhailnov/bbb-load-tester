@@ -14,8 +14,11 @@ import cv2
 
 img = cv2.imread(sys.argv[1], 0)
 template = cv2.imread(sys.argv[2], 0)
-# TODO: test other methods
-method = eval('cv2.TM_CCOEFF')
+# cv2.TM_CCOEFF works ok if Chromium is without address bar (--start-fullscreen),
+# but gives incorrect coordinates if it is with address bar (--start-maximized);
+# cv2.TM_CCOEFF_NORMED seems to work in both cases.
+# Did not test other methods.
+method = eval('cv2.TM_CCOEFF_NORMED')
 res = cv2.matchTemplate(img, template, method)
 min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
 #top_left = max_loc

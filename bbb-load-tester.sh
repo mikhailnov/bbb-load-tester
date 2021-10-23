@@ -175,34 +175,9 @@ _xserver_start(){
 
 # $1: X display (Xephyr)
 # $2: URL
-_launch_chromium(){
-	# https://peter.sh/experiments/chromium-command-line-switches/
-	DISPLAY="$1" _run "$CHROMIUM" \
-		--new-window \
-		--start-fullscreen \
-		--no-default-browser-check \
-		--user-data-dir="$(mktemp -d)" \
-		"$2" \
-		2>/dev/null
-}
-
-# $1: number of tabs
-_echo_tab(){
-	local sec="Tab"
-	for i in $(seq 2 "$1")
-	do
-		sec="$sec Tab"
-	done
-	echo "$sec"
-}
-
-# $1: X display (Xephyr)
-# $2: URL
+# $3: directory with Chromium profile
 _open_bbb_session_dumalogiya(){
 	local X="$1"
-	_xserver_start "$WINDOW_WIDTH"x"$WINDOW_HEIGHT" "$X"
-	_launch_chromium "$X" "$2"
-	_sleep 6
 	DISPLAY="$X" xdotool key Tab Tab Tab
 	DISPLAY="$X" xdotool type "Load"
 	DISPLAY="$X" xdotool key Tab
@@ -214,26 +189,65 @@ _open_bbb_session_dumalogiya(){
 
 # $1: X display (Xephyr)
 # $2: URL
+# $3: directory with Chromium profile
 _open_bbb_session_greenlight(){
 	local X="$1"
-	_xserver_start "$WINDOW_WIDTH"x"$WINDOW_HEIGHT" "$X"
-	_launch_chromium "$X" "$2"
-	_sleep 6
 	DISPLAY="$X" xdotool type "Load Testing ($X)"
 	DISPLAY="$X" xdotool key Return
 }
 
+# $1: X display
+_mk_screenshot(){
+	local file
+	file="$(mktemp --suffix=.png)"
+	# workaround scrot not saving anything if file already exists
+	unlink "$file"
+	DISPLAY="$1" scrot --quality 100 "$file"
+	echo "$file"
+}
+
+# $1: X display
+# $2: screenshot
+# $3: image to find inside the screenshot
+# $4: offset of x coordinate (usually 0)
+# $5: offset of y coordinate (usually 0)
+_click_center_of_image(){
+	local center
+	center="$(find-center.py "$2" "$3")"
+	[ -n "$center" ] || return 1
+	local center_x
+	center_x="$(echo "$center" | cut -d ' ' -f1)"
+	center_x="$(echo "${center_x}+${4}" | bc)"
+	[ -n "$center_x" ] || return 1
+	local center_y
+	center_y="$(echo "$center" | cut -d ' ' -f2)"
+	center_y="$(echo "${center_y}+${5}" | bc)"
+	[ -n "$center_y" ] || return 1
+	DISPLAY="$1" xdotool mousemove "$center_x" "$center_y" click 1
+}
+
+# $1: X display
+# $2: image to find inside the screen
+# $3: offset of x coordinate (usually 0)
+# $4: offset of y coordinate (usually 0)
+_click_by_image(){
+	local screenshot
+	screenshot="$(_mk_screenshot "$1")"
+	_click_center_of_image "$1" "$screenshot" "$2" "$3" "$4"
+}
+
 # $1: X display (Xephyr)
-# $2: number of virtual session
 _setup_bbb_session(){
-	local ns
+	local audio_mode_img
 	case "$AUDIO_MODE" in
-		"listen-only" ) ns=3 ;;
-		"real-microphone" ) ns=2 ;;
-		"virtual-microphone" ) ns=2 ;;
+		listen-only )
+			audio_mode_img="$BUTTONS_DIR/bbb_v2.4_listen.png"
+		;;
+		real-microphone | virtual-microphone )
+			audio_mode_img="$BUTTONS_DIR/bbb_v2.4_microphone.png"
+		;;
 	esac
-	# shellcheck disable=SC2086
-	DISPLAY="$1" xdotool key $(_echo_tab $ns) Return
+	_click_by_image "$1" "$audio_mode_img" 0 0
 	_sleep 2
 	if [ "$AUDIO_MODE" = real-microphone ] || [ "$AUDIO_MODE" = virtual-microphone ]; then
 		# allow to use microphone in the browser
@@ -249,51 +263,15 @@ _setup_bbb_session(){
 		# Clicking Tab works not reliably for webcams, different number of tabs is needed
 		# from time to time and in different versions of BigBlueButton, so using opencv to find button coordinates
 		# Take shot of full virtual (Xephyr) screen
-		local screenshot
-		screenshot="$(mktemp --suffix=.png)"
-		# workaround scrot not saving anything if file already exists
-		unlink "$screenshot"
-		DISPLAY="$1" scrot --quality 100 "$screenshot"
-		local webcam_button_center
-		webcam_button_center="$(find-center.py "$screenshot" "$BUTTONS_DIR"/bbb_v2.4_webcam_button.png)"
-		[ -n "$webcam_button_center" ] || return 1
-		local webcam_button_center_x
-		local webcam_button_center_y
-		webcam_button_center_x="$(echo "$webcam_button_center" | cut -d ' ' -f1)"
-		[ -n "$webcam_button_center_x" ] || return 1
-		webcam_button_center_y="$(echo "$webcam_button_center" | cut -d ' ' -f2)"
-		[ -n "$webcam_button_center_y" ] || return 1
-		DISPLAY="$1" xdotool mousemove "$webcam_button_center_x" "$webcam_button_center_y" click 1
+		_click_by_image "$1" "$BUTTONS_DIR"/bbb_v2.4_webcam_button.png 0 0
 		_sleep 5
 		# allow webcam in the browser
 		DISPLAY="$1" xdotool key Tab Tab Tab Return
 		_sleep 3 #find-center.py will take a few seconds
-		# start webcam (blue button inside webcam dialog)
-		screenshot="$(mktemp --suffix=.png)"
-		# workaround scrot not saving anything if file already exists
-		unlink "$screenshot"
-		DISPLAY="$1" scrot --quality 100 "$screenshot"
-		local start_webcam_button_center
-		start_webcam_button_center="$(find-center.py "$screenshot" "$BUTTONS_DIR"/bbb_v2.4_webcam_dialog_corner.png)"
-		local start_webcam_button_center_x
-		start_webcam_button_center_x="$(echo "$start_webcam_button_center" | cut -d ' ' -f1)"
-		local start_webcam_button_center_y
-		start_webcam_button_center_y="$(echo "$(echo "$start_webcam_button_center" | cut -d ' ' -f2)-72" | bc)"
-		[ -n "$start_webcam_button_center_x" ] || return 1
-		[ -n "$start_webcam_button_center_y" ] || return 1
-		DISPLAY="$1" xdotool mousemove "$start_webcam_button_center_x" "$start_webcam_button_center_y" click 1
+		# start webcam (click the blue button inside webcam dialog)
+		_click_by_image "$1" "$BUTTONS_DIR"/bbb_v2.4_webcam_dialog_corner.png 0 -72
 		_sleep 3
 	fi
-}
-
-# $1: number of virtual session
-_run_virtual_user(){
-	X="$(_gen_virt_display)"
-	"$session_func" "$X" "$URL"
-	_sleep 15
-	_setup_bbb_session "$X" "$1"
-	# do nothing continiously
-	{ set +x; while :; do :; done ;}
 }
 
 # $1: sink name
@@ -329,11 +307,34 @@ _main(){
 	if [ "$VIDEO_MODE" = virtual-webcam ]; then
 		_setup_virtual_camera
 	fi
+	local X
+	X="$(_gen_virt_display)"
+	local chromium_profile_dir
+	chromium_profile_dir="$(mktemp -d)"
+	# start X server and a window manager inside it
+	_xserver_start "$WINDOW_WIDTH"x"$WINDOW_HEIGHT" "$X"
+	# start web-browser inside that X server
+	DISPLAY="$X" _run "$CHROMIUM" \
+		--new-window \
+		--start-maximized \
+		--no-default-browser-check \
+		--user-data-dir="$chromium_profile_dir" \
+		"about:blank" \
+		2>/dev/null
+	_sleep 5
 	for i in $(seq 1 "$NUM")
 	do
-		_run bash -x -c "_run_virtual_user $i"
-		_sleep 60
+		# open a new tab in already launched Chromium
+		DISPLAY="$X" "$CHROMIUM" --user-data-dir="$chromium_profile_dir" --new-tab "$URL"
+		# wait for it to load
+		_sleep 6
+		# login into BigBlueButton
+		"$session_func" "$X" "$URL" "$chromium_profile_dir"
+		_sleep 15
+		# start audio and/or video inside that BigBlueButton client
+		_setup_bbb_session "$X"
 	done
+	# do nothing continiously
 	{ set +x; while :; do :; done ;}
 }
 
