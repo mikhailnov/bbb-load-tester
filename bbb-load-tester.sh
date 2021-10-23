@@ -254,8 +254,7 @@ _setup_bbb_session(){
 		DISPLAY="$1" xdotool key Tab Tab Tab Return
 		_sleep 5
 		# confirm that sound is heard
-		DISPLAY="$1" xdotool key Return
-		DISPLAY="$1" xdotool key Tab Return
+		_click_by_image "$1" "$BUTTONS_DIR/bbb_v2.4_hear_yes.png" 0 0
 		_sleep 3
 	fi
 	if [ "$VIDEO_MODE" = real-webcam ] || [ "$VIDEO_MODE" = virtual-webcam ] ; then
