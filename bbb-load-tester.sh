@@ -301,7 +301,7 @@ _main(){
 			return 1
 		fi
 		# chromium will read it
-		#export PULSE_SOURCE="nullsink_${rand}.monitor"
+		export PULSE_SOURCE="nullsink_${rand}.monitor"
 		export PULSE_SINK="nullsink_${rand}"
 	fi
 	if [ "$VIDEO_MODE" = virtual-webcam ]; then
