@@ -176,12 +176,13 @@ _xserver_start(){
 # $1: X display (Xephyr)
 # $2: URL
 # $3: directory with Chromium profile
+# $4: session number
 _open_bbb_session_dumalogiya(){
 	local X="$1"
 	DISPLAY="$X" xdotool key Tab Tab Tab
 	DISPLAY="$X" xdotool type "Load"
 	DISPLAY="$X" xdotool key Tab
-	DISPLAY="$X" xdotool type "Testing ($X)"
+	DISPLAY="$X" xdotool type "Testing ($4)"
 	DISPLAY="$X" xdotool key Tab
 	DISPLAY="$X" xdotool type "$DUMALOGIYA_PASSWORD"
 	DISPLAY="$X" xdotool key Return
@@ -190,9 +191,10 @@ _open_bbb_session_dumalogiya(){
 # $1: X display (Xephyr)
 # $2: URL
 # $3: directory with Chromium profile
+# $4: session number
 _open_bbb_session_greenlight(){
 	local X="$1"
-	DISPLAY="$X" xdotool type "Load Testing ($X)"
+	DISPLAY="$X" xdotool type "Load Testing ($4)"
 	DISPLAY="$X" xdotool key Return
 }
 
@@ -237,6 +239,7 @@ _click_by_image(){
 }
 
 # $1: X display (Xephyr)
+# $2: number of session
 _setup_bbb_session(){
 	local audio_mode_img
 	case "$AUDIO_MODE" in
@@ -251,7 +254,9 @@ _setup_bbb_session(){
 	_sleep 2
 	if [ "$AUDIO_MODE" = real-microphone ] || [ "$AUDIO_MODE" = virtual-microphone ]; then
 		# allow to use microphone in the browser
-		DISPLAY="$1" xdotool key Tab Tab Tab Return
+		if [ "$2" = 1 ]; then
+			DISPLAY="$1" xdotool key Tab Tab Tab Return
+		fi
 		_sleep 5
 		# confirm that sound is heard
 		_click_by_image "$1" "$BUTTONS_DIR/bbb_v2.4_hear_yes.png" 0 0
@@ -265,7 +270,9 @@ _setup_bbb_session(){
 		_click_by_image "$1" "$BUTTONS_DIR"/bbb_v2.4_webcam_button.png 0 0
 		_sleep 5
 		# allow webcam in the browser
-		DISPLAY="$1" xdotool key Tab Tab Tab Return
+		if [ "$2" = 1 ]; then
+			DISPLAY="$1" xdotool key Tab Tab Tab Return
+		fi
 		_sleep 3 #find-center.py will take a few seconds
 		# start webcam (click the blue button inside webcam dialog)
 		_click_by_image "$1" "$BUTTONS_DIR"/bbb_v2.4_webcam_dialog_corner.png 0 -72
@@ -328,10 +335,10 @@ _main(){
 		# wait for it to load
 		_sleep 6
 		# login into BigBlueButton
-		"$session_func" "$X" "$URL" "$chromium_profile_dir"
+		"$session_func" "$X" "$URL" "$chromium_profile_dir" "$i"
 		_sleep 15
 		# start audio and/or video inside that BigBlueButton client
-		_setup_bbb_session "$X"
+		_setup_bbb_session "$X" "$i"
 	done
 	# do nothing continiously
 	{ set +x; while :; do :; done ;}

@@ -7,6 +7,7 @@
 # It prints coordinates of the center of the small image inside the big one.
 # Based on:
 # https://opencv24-python-tutorials.readthedocs.io/en/latest/py_tutorials/py_imgproc/py_template_matching/py_template_matching.html
+# XXX This script returns random coordinates if it really should have failed when there is no $2 inside $1
 
 import sys
 # python3-opencv
