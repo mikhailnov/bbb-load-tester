@@ -14,10 +14,10 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-static char *v4l2dev = "/dev/video1";
+const char *v4l2dev;
 static int v4l2sink = -1;
-static int width = 80;                //640;    // Default for Flash
-static int height = 60;        //480;    // Default for Flash
+static int width = 160;                //640;    // Default for Flash
+static int height = 100;        //480;    // Default for Flash
 static char *vidsendbuf = NULL;
 static int vidsendsiz = 0;
 
@@ -91,6 +91,7 @@ static void *sendvid(void *v)
 
 int main(int argc, char **argv)
 {
+    v4l2dev = getenv("WEBCAM");
     struct timespec ts;
 
     if( argc == 2 )

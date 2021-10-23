@@ -51,6 +51,7 @@ esac
 for i in \
 	bc \
 	"$CHROMIUM" \
+	pactl \
 	scrot \
 	xdotool \
 	"$XSERVER" \
@@ -65,10 +66,11 @@ done
 AUDIO_MODE="${AUDIO_MODE:-}"
 case "$AUDIO_MODE" in
 	"listen-only" ) : ;;
-	"microphone" ) : ;;
+	"real-microphone" ) : ;;
+	"virtual-microphone" ) : ;;
 	* )
 		# shellcheck disable=SC2016
-		echo 'Set $AUDIO_MODE to listen-only or microphone!'
+		echo 'Set $AUDIO_MODE to listen-only or real-microphone of virtual-microphone!'
 		exit 1
 	;;
 esac
@@ -77,7 +79,7 @@ VIDEO_MODE="${VIDEO_MODE:-}"
 case "$VIDEO_MODE" in
 	"no-webcam" ) : ;;
 	"real-webcam" ) : ;;
-	# TODO: add v4l2loopback-webcam
+	"virtual-webcam" ) : ;;
 	* )
 		# shellcheck disable=SC2016
 		echo 'Set $VIDEO_MODE to no-webcam or real-webcam!'
@@ -109,7 +111,20 @@ esac
 TMPDIR="$(mktemp -d)"
 export TMPDIR
 PID_LIST="$(mktemp)"
-trap 'for i in $(tac "$PID_LIST"); do kill $i || : ; kill -9 $i || : ; done; rm -fr "$TMPDIR"' EXIT
+
+virtual_pulseaudio_sink_number=""
+_cleanup(){
+	for i in $(tac "$PID_LIST")
+	do
+		kill "$i" 2>/dev/null || :
+		kill -9 "$i" 2>/dev/null || :
+	done
+	if [ -n "$virtual_pulseaudio_sink_number" ]; then
+		pactl unload-module "$virtual_pulseaudio_sink_number" || :
+	fi
+	rm -fr "$TMPDIR"
+}
+trap '_cleanup' EXIT
 
 _sleep(){
 	local a="$1"
@@ -214,12 +229,13 @@ _setup_bbb_session(){
 	local ns
 	case "$AUDIO_MODE" in
 		"listen-only" ) ns=3 ;;
-		"microphone" ) ns=2 ;;
+		"real-microphone" ) ns=2 ;;
+		"virtual-microphone" ) ns=2 ;;
 	esac
 	# shellcheck disable=SC2086
 	DISPLAY="$1" xdotool key $(_echo_tab $ns) Return
 	_sleep 2
-	if [ "$AUDIO_MODE" = microphone ]; then
+	if [ "$AUDIO_MODE" = real-microphone ] || [ "$AUDIO_MODE" = virtual-microphone ]; then
 		# allow to use microphone in the browser
 		DISPLAY="$1" xdotool key Tab Tab Tab Return
 		_sleep 5
@@ -228,7 +244,7 @@ _setup_bbb_session(){
 		DISPLAY="$1" xdotool key Tab Return
 		_sleep 3
 	fi
-	if [ "$VIDEO_MODE" = real-webcam ]; then
+	if [ "$VIDEO_MODE" = real-webcam ] || [ "$VIDEO_MODE" = virtual-webcam ] ; then
 		# Trigger webcam dialog
 		# Clicking Tab works not reliably for webcams, different number of tabs is needed
 		# from time to time and in different versions of BigBlueButton, so using opencv to find button coordinates
@@ -280,7 +296,39 @@ _run_virtual_user(){
 	{ set +x; while :; do :; done ;}
 }
 
+# $1: sink name
+# This works with both pulseaudio and pipewire
+_setup_virtual_sound(){
+	local sink
+	if ! sink="$(pactl load-module module-null-sink sink_name="$1")" ; then
+		return $?
+	fi
+	echo "$sink"
+}
+
+# XXX For now just disconnect all real webcams to make the virtual one be the only
+# and default choice in Chromium. In theory bubblewrap can be used to override /dev/video* for Chromium.
+_setup_virtual_camera(){
+	# We modprobe v4l2loopback via configs in /etc
+	# sudo modprobe v4l2loopback exclusive_caps=1 devices=1 video_nr=55 card_label="bbb-load-tester virtual webcam" max_width=640 max_height=480 max_openers=100
+	_run env WEBCAM=/dev/video55 ondemandcam
+}
+
 _main(){
+	if [ "$AUDIO_MODE" = virtual-microphone ]; then
+		local rand
+		rand="$(base64 /dev/urandom | head -c 5 || :)"
+		if ! virtual_pulseaudio_sink_number="$(_setup_virtual_sound "nullsink_${rand}")"; then
+			echo "Failed to setup virtual audio source!"
+			return 1
+		fi
+		# chromium will read it
+		#export PULSE_SOURCE="nullsink_${rand}.monitor"
+		export PULSE_SINK="nullsink_${rand}"
+	fi
+	if [ "$VIDEO_MODE" = virtual-webcam ]; then
+		_setup_virtual_camera
+	fi
 	for i in $(seq 1 "$NUM")
 	do
 		_run bash -x -c "_run_virtual_user $i"
