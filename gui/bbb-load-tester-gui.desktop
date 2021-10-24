@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=BBB Load Tester
+Version=1.0
+Exec=bbb-load-tester-gui
+Comment=Load test BigBlueButton
+Comment[ru]=Нагрузочное тестирование BigBlueButton
+Icon=bbb-load-tester-gui.svg
+Type=Application
+Terminal=false
+Encoding=UTF-8
+Categories=Network;
