@@ -1,2 +1,4 @@
 # resulting binary
 bbb-load-tester-gui
+# Geany project
+*.geany

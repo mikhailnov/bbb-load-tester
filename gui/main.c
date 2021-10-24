@@ -1,27 +1,21 @@
-// https://gist.github.com/fracek/3323924
+// Thanks to https://librebay.github.io for a good guide
 
 #include <gtk/gtk.h>
 
-static void
-activate(GtkApplication *app,
-    gpointer user_data) {
-    GtkWidget *window;
-
-    window = gtk_application_window_new(app);
-    gtk_window_set_title(GTK_WINDOW(window), "Hello GNOME");
-    gtk_widget_show_all(window);
-}
-
 int
-main(int argc, char **argv) {
-    GtkApplication *app;
-    int status;
+main(int argc, char *argv[])
+{
+	GtkWidget *window;
+	GtkWidget *button;
 
-    app = gtk_application_new("org.gtk.example",
-        G_APPLICATION_FLAGS_NONE);
-    g_signal_connect(app, "activate",
-        G_CALLBACK(activate), NULL);
-    status = g_application_run(G_APPLICATION(app), argc, argv);
-    g_object_unref(app);
-    return (status);
+	gtk_init(&argc, &argv);
+
+	window = gtk_window_new(GTK_WINDOW_TOPLEVEL);	
+	button = gtk_button_new_with_label("Hello World!");
+	gtk_container_add(GTK_CONTAINER(window), button);
+
+	gtk_widget_show(window);
+	gtk_main();
+
+	return 0;
 }
