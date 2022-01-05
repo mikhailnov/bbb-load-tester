@@ -53,9 +53,11 @@ for i in \
 	"$CHROMIUM" \
 	pactl \
 	scrot \
+	xclip \
 	xdotool \
 	"$XSERVER" \
-	xfwm4
+	xfwm4 \
+	xrandr
 do
 	if ! command -v "$i" >/dev/null 2>&1; then
 		echo "Install $i !"
@@ -92,9 +94,11 @@ session_func=""
 case "$SESSION_TYPE" in
 	"greenlight" )
 		session_func=_open_bbb_session_greenlight
+		session_login_page_loaded_text="Записи комнаты"
 	;;
 	"dumalogiya-wp" )
 		session_func=_open_bbb_session_dumalogiya
+		session_login_page_loaded_text="Вебинарная комната для проверки работы"
 		if [ -z "${DUMALOGIYA_PASSWORD:-}" ]; then
 			# shellcheck disable=SC2016
 			echo 'Set $DUMALOGIYA_PASSWORD!'
@@ -238,6 +242,75 @@ _click_by_image(){
 	_click_center_of_image "$1" "$screenshot" "$2" "$3" "$4"
 }
 
+# XXX sometimes _xclip fails with:
+# Error: target STRING not available
+# Retry for two times
+_xclip(){
+	local o
+	if o="$(xclip "$@")"
+	then
+		echo "$o"
+		return 0
+	fi
+	if o="$(xclip "$@")"
+	then
+		echo "$o"
+	else
+		return 1
+	fi
+}
+
+# $1: initial wait
+# $2: text to search for on the page
+# $3: how long to wait before retrying search
+# $4: max retries
+# $5: $DISPLAY
+# $6: X coordinate where to click to remove selection by Ctrl+A
+# $7: Y coordinate where to click to remove selection by Ctrl+A
+_wait_until_page_is_loaded(){
+	_sleep "$1"
+	local c=0
+	while :
+	do
+		if [ "$c" -gt "$4" ]; then
+			return 1
+		fi
+		local text
+		if ! text="$(DISPLAY="$5" xdotool key Control+a Control+c && \
+		             DISPLAY="$5" _xclip -o -sel c && \
+					 DISPLAY="$5" xdotool mousemove "$6" "$7" click 1 \
+					)"
+		then
+			c=$((++c))
+			_sleep "$3"
+			continue
+		else
+			# shellcheck disable=SC2076
+			if [[ "$text" =~ "$2" ]]
+			then
+				break
+			else
+				c=$((++c))
+				_sleep "$3"
+				continue
+			fi
+		fi
+	done
+}
+
+# $1: $DISPLAY
+_get_center_of_screen(){
+	local ar
+	# https://superuser.com/a/1207339
+	# Another possible way is taking a screenshot and reading its geometry
+	IFS=x read -r -a ar < <(DISPLAY="$1" xrandr --current | sed -n 's/.* connected \([0-9]*\)x\([0-9]*\)+.*/\1x\2/p')
+	local x
+	local y
+	x=$((ar[0] / 2))
+	y=$((ar[1] / 2))
+	echo "$x" "$y"
+}
+
 # $1: X display (Xephyr)
 # $2: number of session
 _setup_bbb_session(){
@@ -250,17 +323,20 @@ _setup_bbb_session(){
 			audio_mode_img="$BUTTONS_DIR/bbb_v2.4_microphone.png"
 		;;
 	esac
+	local center
+	read -r -a center < <(_get_center_of_screen "$1")
+	_wait_until_page_is_loaded 6 "Как вы хотите войти" 3 30 "$1" "${center[0]}" "${center[1]}"
 	_click_by_image "$1" "$audio_mode_img" 0 0
-	_sleep 2
+	_sleep 3
 	if [ "$AUDIO_MODE" = real-microphone ] || [ "$AUDIO_MODE" = virtual-microphone ]; then
 		# allow to use microphone in the browser
 		if [ "$2" = 1 ]; then
 			DISPLAY="$1" xdotool key Tab Tab Tab Return
 		fi
-		_sleep 5
+		_wait_until_page_is_loaded 2 "Слышите ли вы себя" 2 10 "$1" "${center[0]}" "${center[1]}"
 		# confirm that sound is heard
 		_click_by_image "$1" "$BUTTONS_DIR/bbb_v2.4_hear_yes.png" 0 0
-		_sleep 3
+		_sleep 5
 	fi
 	if [ "$VIDEO_MODE" = real-webcam ] || [ "$VIDEO_MODE" = virtual-webcam ] ; then
 		# Trigger webcam dialog
@@ -268,10 +344,14 @@ _setup_bbb_session(){
 		# from time to time and in different versions of BigBlueButton, so using opencv to find button coordinates
 		# Take shot of full virtual (Xephyr) screen
 		_click_by_image "$1" "$BUTTONS_DIR"/bbb_v2.4_webcam_button.png 0 0
-		_sleep 5
 		# allow webcam in the browser
-		if [ "$2" = 1 ]; then
+		if [ "$2" = 1 ]
+		then
+			_sleep 5
 			DISPLAY="$1" xdotool key Tab Tab Tab Return
+		else
+			# tab+tab+tab+enter does not work after _wait_until_page_is_loaded()
+			_wait_until_page_is_loaded 3 "Настройки веб-камеры" 2 5 "$1" $((center[0] - 12)) "${center[1]}"
 		fi
 		_sleep 3 #find-center.py will take a few seconds
 		# start webcam (click the blue button inside webcam dialog)
@@ -333,10 +413,10 @@ _main(){
 		# open a new tab in already launched Chromium
 		DISPLAY="$X" "$CHROMIUM" --user-data-dir="$chromium_profile_dir" --new-tab "$URL"
 		# wait for it to load
-		_sleep 6
+		_wait_until_page_is_loaded 6 "$session_login_page_loaded_text" 3 10 "$X" 10 100
 		# login into BigBlueButton
 		"$session_func" "$X" "$URL" "$chromium_profile_dir" "$i"
-		_sleep 15
+		_sleep 5
 		# start audio and/or video inside that BigBlueButton client
 		_setup_bbb_session "$X" "$i"
 	done
