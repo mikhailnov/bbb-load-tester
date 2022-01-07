@@ -16,7 +16,25 @@ else
 	BUTTONS_DIR=/usr/share/bbb-load-tester
 fi
 
-CHROMIUM="${CHROMIUM:-chromium-browser}"
+CHROMIUM="${CHROMIUM:-}"
+if [ -z "$CHROMIUM" ]; then
+	# ROSA, Ubuntu use chromium-browser
+	# ALT, Debian use chromium
+	for i in \
+		chromium-browser \
+		chromium \
+		google-chrome
+	do
+		if command -v "$1" 2>&1 >/dev/null; then
+			CHROMIUM="$1"
+			break
+		fi
+	done
+fi
+if [ -z "$CHROMIUM" ]; then
+	echo 'Have not found Chromium or Chrome browser. Try setting env CHROMIUM='
+	exit 1
+fi
 SLEEP_KOEF="${SLEEP_KOEF:-1}"
 # wide enough to avoid automatic collapsing of chat etc., it will change number of tabs by xdotool
 WINDOW_WIDTH="${WINDOW_WIDTH:-1270}"
