@@ -21,4 +21,5 @@ install(FILES
         DESTINATION /usr/share/bbb-load-tester)
 
 # build gui
-add_subdirectory(gui)
+# XXX GUI is not ready yet, don't build it by default
+#add_subdirectory(gui)

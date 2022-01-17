@@ -1,0 +1,29 @@
+Source: bbb-load-tester
+Section: sound
+Priority: optional
+Maintainer: Mikhail Novosyolov <mikhailnov@dumalogiya.ru>
+Standards-Version: 4.1.4
+Homepage: https://github.com/mikhailnov/bbb-load-tester
+Build-Depends: debhelper (>=9),
+               cmake,
+               c-compiler,
+               libc-dev
+
+Package: bbb-load-tester
+Architecture: any
+Depends: ${misc:Depends},
+         ${shlibs:Depends},
+         bash,
+         bc,
+         chromium | chromium-browser,
+         pulseaudio-utils,
+         python3-opencv,
+         scrot,
+         xclip,
+         xdotool,
+         xvfb,
+         xserver-xephyr,
+         xfwm4,
+         x11-xserver-utils
+Description: Script to stress-test BigBlueButton
+ Opens a Chromium-based browser with BigBlueButton clients.

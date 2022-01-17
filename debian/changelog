@@ -1,0 +1,5 @@
+bbb-load-tester (1.1-1) unstable; urgency=low
+
+  * Initial build of deb package for Debian and Ubuntu
+
+ -- Mikhail Novosyolov <mikhailnov@dumalogiya.ru>  Mon, 17 Jan 2022 21:03:00 +0300
