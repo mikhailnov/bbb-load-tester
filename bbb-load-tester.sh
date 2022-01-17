@@ -186,9 +186,10 @@ _gen_virt_display(){
 
 # $1: resolution
 # $2: screen
-# example: _xserver_start 1024x720 :10
+# $3: X server type, Xephyr or Xvfb
+# example: _xserver_start 1024x720 :10 Xephyr
 _xserver_start(){
-	case "$XSERVER" in
+	case "$3" in
 		Xephyr ) _run Xephyr -br -ac -noreset -screen "$1" "$2" ;;
 		Xvfb ) _run Xvfb "$2" -screen 0 "$1"x24 ;;
 	esac
@@ -416,7 +417,7 @@ _main(){
 	local chromium_profile_dir
 	chromium_profile_dir="$(mktemp -d)"
 	# start X server and a window manager inside it
-	_xserver_start "$WINDOW_WIDTH"x"$WINDOW_HEIGHT" "$X"
+	_xserver_start "$WINDOW_WIDTH"x"$WINDOW_HEIGHT" "$X" "$XSERVER"
 	# start web-browser inside that X server
 	DISPLAY="$X" _run "$CHROMIUM" \
 		--new-window \
